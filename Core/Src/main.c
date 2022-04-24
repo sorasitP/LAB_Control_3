@@ -24,6 +24,11 @@
 #define _USE_MATH_DEFINES
 #include "math.h"
 #include "MatLib.h"
+
+#define max(a,b) \
+  ({ __typeof__ (a) _a = (a); \
+      __typeof__ (b) _b = (b); \
+    _a > _b ? _a : _b; })
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,8 +63,14 @@ float angle_base = 0;
 float threshold = 0.5*2*M_PI;
 float angle_max =2*M_PI;
 
-float result = 0;
+float position = 0;
+float velocity = 0;
+float accerelation = 0;
 float dt = 0.01;
+
+float ang = 0;
+float PWMOut1 = 0;
+float PWMOut2 = 0;
 
 Mat I;
 Mat A;
@@ -134,6 +145,8 @@ void prediction();
 void update();
 void kalmanfilter();
 void setmatrix();
+
+void calPWM();
 /*
 void multiplymatrix(float mult[][10],float A[][10],float B [][10],int rowA, int colA, int rowB,int colB);
 void summatrix(float res[][10],float A[][10],float B [][10],int rowA, int colA);
@@ -181,10 +194,13 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
+  	//micro
 	HAL_TIM_Base_Start_IT(&htim4);
+	//Encoder
 	HAL_TIM_Base_Start_IT(&htim1);
 	HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_ALL);
 
+	//PWM
 	HAL_TIM_Base_Start(&htim3);
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
@@ -197,18 +213,24 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  Unwrap();
+	  if(HAL_GetTick()-Timestamp >10)
+	  {
+		  prediction();
+		  update();
+		  kalmanfilter();
 
+		  calPWM();
+		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, PWMOut1);
+		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, PWMOut2);
+
+		  Timestamp = HAL_GetTick();
+	  }
 
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  Unwrap();
-	  if(HAL_GetTick()-Timestamp >10){
-		  prediction();
-		  update();
-		  kalmanfilter();
-		  Timestamp = HAL_GetTick();
-	  }
+
 
 
 
@@ -502,7 +524,6 @@ void Unwrap()
 		angle_base = angle_base_before;
 	}
 	angle_sum = angle + angle_base;
-
 }
 
 void prediction(){
@@ -526,7 +547,9 @@ void update(){
 
 void kalmanfilter(){
 	y = multiply(C, x);
-	result = y.entries[0][0];
+	position = y.entries[0][0];
+	velocity = x.entries[1][0];
+	accerelation = x.entries[2][0];
 }
 
 void setmatrix(){
@@ -554,6 +577,12 @@ void setmatrix(){
 	P_new = newmat(3, 3, data_zero);
 	y = newmat(1, 1, data_zero);
 	y_old = newmat(1, 1, data_zero);
+}
+
+void calPWM(){
+	PWMOut1 = max(0.0, 10000*sin(ang));
+	PWMOut2 = max(0.0, 10000*sin(ang+M_PI));
+	ang += (1.0/100.0)*M_PI;
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
