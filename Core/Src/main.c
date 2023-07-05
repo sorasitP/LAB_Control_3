@@ -558,7 +558,7 @@ void setmatrix(){
 	float data_G[9] = {dt*dt,dt,1};
 	float data_C[9] = {1,0,0};
 	float data_R[9] = {0.0033};
-	float data_Q[9] = {0.5};
+	float data_Q[9] = {0.0};
 	float data_zero[9] = {0,0,0,0,0,0,0,0,0};
 
 	I = newmat(3, 3, data_I);
